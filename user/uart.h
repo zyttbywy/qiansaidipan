@@ -12,6 +12,6 @@ extern fifo_struct uart2_data_fifo;
 
 void my_uart_write_byte(unsigned char byte);
 void Data_Send(int* pst);
-void get_expect_speed(void);
+uint8 get_expect_speed(void);
 void get_expect_speed_receiver(void);
 #endif // _UART_H_

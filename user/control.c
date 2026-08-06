@@ -1,5 +1,6 @@
 #include "zf_common_headfile.h"
 #include "control.h"
+#include "siyuanshu.h"
 
 int left_up_goal = 0;
 int right_up_goal = 0;
@@ -28,11 +29,14 @@ float wd = 0.0; // 微分增益
 double x = 0;
 double y = 0;
 double o = 0;
+double odom_vx = 0;
+double odom_vy = 0;
+double odom_wz = 0;
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介       X型麦轮运动学逆解：将期望速度分解为四轮目标速度
 // 参数说明       x_speed         前进方向期望速度（正=前进）
-// 参数说明       y_speed         横向期望速度（正=右移）
+// 参数说明       y_speed         横向期望速度（正=左移）
 // 参数说明       o_speed         旋转期望速度（正=逆时针）
 // 返回参数       void
 // 使用示例       speed_compute(x_speed, y_speed, o_speed);
@@ -40,10 +44,10 @@ double o = 0;
 //                结果保存到 left_up_goal / right_up_goal / left_down_goal / right_down_goal
 //-------------------------------------------------------------------------------------------------------------------
 void speed_compute(int x_speed, int y_speed, int o_speed){
-    left_up_goal   =  x_speed + y_speed - o_speed;   // 左前轮 FL(/)
-    right_up_goal  =  x_speed - y_speed + o_speed;   // 右前轮 FR(\)
-    left_down_goal =  x_speed - y_speed - o_speed;   // 左后轮 RL(\)
-    right_down_goal =  x_speed + y_speed + o_speed;  // 右后轮 RR(/)
+    left_up_goal    = x_speed - y_speed - o_speed;   // 左前轮 FL(/)
+    right_up_goal   = x_speed + y_speed + o_speed;   // 右前轮 FR(\)
+    left_down_goal  = x_speed + y_speed - o_speed;   // 左后轮 RL(\)
+    right_down_goal = x_speed - y_speed + o_speed;   // 右后轮 RR(/)
 }
 
 void speed_control()
@@ -213,31 +217,47 @@ void speed_control()
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-// 函数简介       X型麦轮里程计：由四轮速度积分计算绝对位姿
-// 参数说明       void
+// 函数简介       X型麦轮里程计：四轮编码器积分x/y，四元数解算yaw
+// 参数说明       use_imu_yaw     1-使用四元数yaw 0-yaw保持不变
 // 返回参数       void
-// 使用示例       odometry_update();  // 在 PIT 中断中调用（50ms 周期）
+// 使用示例       odometry_update(1);  // 在 PIT 中断中调用（50ms 周期）
 // 备注信息       结果保存到 x(坐标), y(坐标), o(朝向弧度, 归一化到[-π,π])
-//                逆时针旋转 o 减小（为负）
+//                逆时针旋转 o 增大（为正）
 //-------------------------------------------------------------------------------------------------------------------
-void odometry_update(void)
+void odometry_update(uint8 use_imu_yaw)
 {
     // ---- X型麦轮正运动学：轮速 → 车体速度 ----
     double vx = ( left_up_speed + right_up_speed + left_down_speed + right_down_speed) / 4.0;
-    double vy = ( left_up_speed - right_up_speed - left_down_speed + right_down_speed) / 4.0;
-    double vw = (-left_up_speed + right_up_speed - left_down_speed + right_down_speed) / 4.0;
+    double vy = (-left_up_speed + right_up_speed + left_down_speed - right_down_speed) / 4.0;
+    double yaw_from_quaternion;
+    double yaw_delta;
 
     // ---- 积分（PIT 周期 50ms）----
     const double dt = 0.05;
 
-    o -= vw * dt;                                       // 逆时针为负
+    odom_vx = vx * 2.2;
+    odom_vy = vy * 1.97;
+    if(use_imu_yaw)
+    {
+        yaw_from_quaternion = (double)eulerAngle_yaw;
+        yaw_delta = yaw_from_quaternion - o;
+        while(yaw_delta >  3.14159265358979) yaw_delta -= 6.28318530717958;
+        while(yaw_delta < -3.14159265358979) yaw_delta += 6.28318530717958;
+        odom_wz = yaw_delta / dt;
+        o = yaw_from_quaternion;
+    }
+    else
+    {
+        odom_wz = 0;
+        o += odom_wz * dt;
+    }
 
     // 角度归一化到 [-π, π]
     while(o >  3.14159265358979) o -= 6.28318530717958;
     while(o < -3.14159265358979) o += 6.28318530717958;
 
-    x += (vx * cos(o) - vy * sin(o)) * dt * 2.2;
-    y += (vx * sin(o) + vy * cos(o)) * dt * 1.97;
+    x += (odom_vx * cos(o) - odom_vy * sin(o)) * dt;
+    y += (odom_vx * sin(o) + odom_vy * cos(o)) * dt;
 }
 
 void wheel_init(){

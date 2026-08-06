@@ -38,6 +38,8 @@
 #include "uart.h"
 #include "zf_device_uart_receiver.h"
 
+extern fifo_struct uart2_data_fifo;
+
 // ����TCϵ��Ĭ���ǲ�֧���ж�Ƕ�׵ģ�ϣ��֧���ж�Ƕ����Ҫ���ж���ʹ�� interrupt_global_enable(0); �������ж�Ƕ��
 // �򵥵�˵ʵ���Ͻ����жϺ�TCϵ�е�Ӳ���Զ������� interrupt_global_disable(); ���ܾ���Ӧ�κε��жϣ������Ҫ�����Լ��ֶ����� interrupt_global_enable(0); �������жϵ���Ӧ��
 
@@ -91,8 +93,6 @@ IFX_INTERRUPT(exti_ch0_ch4_isr, 0, EXTI_CH0_CH4_INT_PRIO)
     if(exti_flag_get(ERU_CH0_REQ0_P15_4))           // ͨ��0�ж�
     {
         exti_flag_clear(ERU_CH0_REQ0_P15_4);
-		
-        imu660rc_callback(); 	//			660RC ģ�� INT �����ж�
     }
 
     if(exti_flag_get(ERU_CH4_REQ13_P15_5))          // ͨ��4�ж�
@@ -213,7 +213,7 @@ IFX_INTERRUPT(uart2_tx_isr, 0, UART2_TX_INT_PRIO)
 IFX_INTERRUPT(uart2_rx_isr, 0, UART2_RX_INT_PRIO)
 {
     interrupt_global_enable(0);                     // �����ж�Ƕ��
-    // wireless_module_uart_handler();                 // ����ģ��ͳһ�ص�����
+
     // 用户自定义：将 UART2 接收数据写入 fifo 供 get_expect_speed 使用
     {
         uint8 get_data;

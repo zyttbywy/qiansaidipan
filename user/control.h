@@ -45,9 +45,12 @@ extern int rd[3];
 extern double x;
 extern double y;
 extern double o;
+extern double odom_vx;
+extern double odom_vy;
+extern double odom_wz;
 
 void speed_compute(int x_speed, int y_speed, int o_speed);
 void speed_control(void);
-void odometry_update(void);
+void odometry_update(uint8 use_imu_yaw);
 
 #endif // _CONTROL_H_

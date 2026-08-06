@@ -64,10 +64,11 @@ void Data_Send(int* pst) {
 //                解析结果保存到全局变量 x_speed, y_speed, o_speed
 //                依赖 UART1 接收中断将数据写入 uart2_data_fifo
 //-------------------------------------------------------------------------------------------------------------------
-void get_expect_speed(void)
+uint8 get_expect_speed(void)
 {
     static char buffer[64];
     static int idx = 0;
+    uint8 updated = 0;
 
     uint32 fifo_count = fifo_used(&uart2_data_fifo);
     if(fifo_count != 0)
@@ -81,9 +82,19 @@ void get_expect_speed(void)
             {
                 if(idx > 0)
                 {
+                    int new_x_speed;
+                    int new_y_speed;
+                    int new_o_speed;
+
                     buffer[idx] = '\0';
-                    sscanf(buffer, "x_speed:%d y_speed:%d o_speed:%d",
-                           &x_speed, &y_speed, &o_speed);
+                    if(3 == sscanf(buffer, "x_speed:%d y_speed:%d o_speed:%d",
+                           &new_x_speed, &new_y_speed, &new_o_speed))
+                    {
+                        x_speed = new_x_speed;
+                        y_speed = new_y_speed;
+                        o_speed = new_o_speed;
+                        updated = 1;
+                    }
                     idx = 0;
                 }
             }
@@ -93,6 +104,8 @@ void get_expect_speed(void)
             }
         }
     }
+
+    return updated;
 }
 
 //-------------------------------------------------------------------------------------------------------------------
