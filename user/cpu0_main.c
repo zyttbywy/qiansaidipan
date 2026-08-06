@@ -44,11 +44,15 @@ int expect_speed = 0;
 #define UART2_TX_PIN            (UART2_TX_P33_9)
 #define UART2_RX_PIN            (UART2_RX_P33_8)
 #define IMU_UPDATE_PERIOD_MS    (5)
+#define IMU_REPORT_PERIOD_MS    (20)
 #define CONTROL_PERIOD_MS       (50)
 #define CONTROL_PERIOD_DIV      (CONTROL_PERIOD_MS / IMU_UPDATE_PERIOD_MS)
+#define IMU_REPORT_PERIOD_DIV   (IMU_REPORT_PERIOD_MS / IMU_UPDATE_PERIOD_MS)
 #define COMMAND_TIMEOUT_MS      (300)
 #define ODOM_POSITION_TO_M      (0.01)
 #define ODOM_VELOCITY_TO_MPS    (0.01)
+#define GRAVITY_MPS2            (9.80665)
+#define DEG_TO_RAD              (0.0174532925199433)
 #define IMU_DISPLAY_X           (132)
 #define IMU_DISPLAY_VALUE_X     (156)
 
@@ -56,7 +60,9 @@ uint8 uart2_rx_buffer[64];                                                      
 fifo_struct uart2_data_fifo;                                                    // UART1 fifo 结构体
 volatile uint32 system_ms = 0;
 volatile uint8 odom_send_flag = 0;
+volatile uint8 imu_send_flag = 0;
 uint32 odom_seq = 0;
+uint32 imu_seq = 0;
 uint32 last_command_ms = 0;
 uint8 imu660ra_state = 1;
 // 将本语句与#pragma section all restore语句之间的全局变量都放在CPU0的RAM中
@@ -141,6 +147,78 @@ static void send_odom_frame(void)
     uart_write_buffer(UART_2, (const uint8 *)odom_buffer, length);
 }
 
+/*
+ * Send the uncorrected IMU measurement in ROS body coordinates.
+ * The existing AHRS/gyro bias code is intentionally not used here: this
+ * frame is raw sensor data for the upper computer's later fusion stage.
+ */
+static void send_imu_frame(void)
+{
+    int8 imu_buffer[256];
+    char gx_buffer[24];
+    char gy_buffer[24];
+    char gz_buffer[24];
+    char ax_buffer[24];
+    char ay_buffer[24];
+    char az_buffer[24];
+    uint32 length;
+    uint32 interrupt_state;
+    uint32 timestamp_ms;
+    int16 gyro_x_snapshot;
+    int16 gyro_y_snapshot;
+    int16 gyro_z_snapshot;
+    int16 acc_x_snapshot;
+    int16 acc_y_snapshot;
+    int16 acc_z_snapshot;
+    float acc_factor;
+    float gyro_factor;
+    double gx;
+    double gy;
+    double gz;
+    double ax;
+    double ay;
+    double az;
+
+    interrupt_state = interrupt_global_disable();
+    timestamp_ms = system_ms;
+    gyro_x_snapshot = imu660ra_gyro_x;
+    gyro_y_snapshot = imu660ra_gyro_y;
+    gyro_z_snapshot = imu660ra_gyro_z;
+    acc_x_snapshot = imu660ra_acc_x;
+    acc_y_snapshot = imu660ra_acc_y;
+    acc_z_snapshot = imu660ra_acc_z;
+    acc_factor = imu660ra_transition_factor[0];
+    gyro_factor = imu660ra_transition_factor[1];
+    interrupt_global_enable(interrupt_state);
+
+    if((acc_factor <= 0.0f) || (gyro_factor <= 0.0f))
+    {
+        return;
+    }
+
+    /* IMU660RA reports acceleration in g and gyro speed in deg/s. */
+    gx = ((double)gyro_x_snapshot / (double)gyro_factor) * DEG_TO_RAD;
+    gy = ((double)gyro_y_snapshot / (double)gyro_factor) * DEG_TO_RAD;
+    gz = ((double)gyro_z_snapshot / (double)gyro_factor) * DEG_TO_RAD;
+    ax = ((double)acc_x_snapshot / (double)acc_factor) * GRAVITY_MPS2;
+    ay = ((double)acc_y_snapshot / (double)acc_factor) * GRAVITY_MPS2;
+    az = ((double)acc_z_snapshot / (double)acc_factor) * GRAVITY_MPS2;
+
+    odom_float_to_string(gx_buffer, gx);
+    odom_float_to_string(gy_buffer, gy);
+    odom_float_to_string(gz_buffer, gz);
+    odom_float_to_string(ax_buffer, ax);
+    odom_float_to_string(ay_buffer, ay);
+    odom_float_to_string(az_buffer, az);
+
+    length = zf_sprintf(imu_buffer,
+            "imu seq:%u ts_ms:%u gx:%s gy:%s gz:%s ax:%s ay:%s az:%s\r\n",
+            imu_seq++, timestamp_ms,
+            gx_buffer, gy_buffer, gz_buffer,
+            ax_buffer, ay_buffer, az_buffer);
+    uart_write_buffer(UART_2, (const uint8 *)imu_buffer, length);
+}
+
 
 int core0_main(void)
 {
@@ -209,6 +287,14 @@ int core0_main(void)
             odom_send_flag = 0;
             send_odom_frame();
         }
+        if(imu_send_flag)
+        {
+            imu_send_flag = 0;
+            if(0 == imu660ra_state)
+            {
+                send_imu_frame();
+            }
+        }
         // 显示三个通道原始值 (0~2047)，每行 20 像素
         // Y=0:  x_speed  y_speed  o_speed（期望速度，调试用）
         ips130_show_int(0, 0,  x_speed, 6);
@@ -243,9 +329,17 @@ int core0_main(void)
 IFX_INTERRUPT(cc60_pit_ch0_isr, 0, CCU6_0_CH0_ISR_PRIORITY)
 {
     static uint8 control_period_count = 0;
+    static uint8 imu_report_period_count = 0;
     interrupt_global_enable(0);                     // 开启中断嵌套
     pit_clear_flag(CCU60_CH0);
     system_ms += IMU_UPDATE_PERIOD_MS;
+
+    imu_report_period_count++;
+    if(imu_report_period_count >= IMU_REPORT_PERIOD_DIV)
+    {
+        imu_report_period_count = 0;
+        imu_send_flag = 1;
+    }
 
     if(0 == imu660ra_state)
     {
