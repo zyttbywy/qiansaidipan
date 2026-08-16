@@ -22,6 +22,10 @@
 #define RIGHT_DOWN_FORWARD 1
 #define RIGHT_DOWN_BACKWARD 0
 
+// 1: zero wheel targets disable PWM so the chassis can be pushed by hand.
+// 0: keep the original active zero-speed PID holding behavior.
+#define ZERO_SPEED_COAST_ENABLE 1
+
 extern int left_up_goal;
 extern int right_up_goal;
 extern int left_down_goal;

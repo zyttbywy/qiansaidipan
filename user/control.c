@@ -33,6 +33,32 @@ double odom_vx = 0;
 double odom_vy = 0;
 double odom_wz = 0;
 
+static void speed_control_coast(void)
+{
+    pwm_left_up = 0;
+    pwm_right_up = 0;
+    pwm_left_down = 0;
+    pwm_right_down = 0;
+
+    lu[0] = 0;
+    lu[1] = 0;
+    lu[2] = 0;
+    ru[0] = 0;
+    ru[1] = 0;
+    ru[2] = 0;
+    ld[0] = 0;
+    ld[1] = 0;
+    ld[2] = 0;
+    rd[0] = 0;
+    rd[1] = 0;
+    rd[2] = 0;
+
+    pwm_set_duty(LEFT_UP_WHELL_PWM, 0);
+    pwm_set_duty(RIGHT_UP_WHELL_PWM, 0);
+    pwm_set_duty(LEFT_DOWN_WHELL_PWM, 0);
+    pwm_set_duty(RIGHT_DOWN_WHELL_PWM, 0);
+}
+
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介       X型麦轮运动学逆解：将期望速度分解为四轮目标速度
 // 参数说明       x_speed         前进方向期望速度（正=前进）
@@ -50,8 +76,17 @@ void speed_compute(int x_speed, int y_speed, int o_speed){
     right_down_goal = x_speed - y_speed + o_speed;   // 右后轮 RR(/)
 }
 
-void speed_control()
+void speed_control(void)
 {
+    if(ZERO_SPEED_COAST_ENABLE
+            && (0 == left_up_goal) && (0 == right_up_goal)
+            && (0 == left_down_goal) && (0 == right_down_goal))
+    {
+        // Do not let encoder motion create reverse PID torque while the user
+        // is manually pushing the chassis for mapping.
+        speed_control_coast();
+        return;
+    }
 
     lu[0] = left_up_goal - left_up_speed; // e(k)
 
