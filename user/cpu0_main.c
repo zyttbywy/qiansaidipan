@@ -244,7 +244,9 @@ int core0_main(void)
     encoder_dir_init(TIM6_ENCODER, TIM6_ENCODER_CH1_P20_3, TIM6_ENCODER_CH2_P20_0);
 
     pit_ms_init(CCU60_CH0, IMU_UPDATE_PERIOD_MS);
+#if SBUS_SPEED_CONTROL_ENABLE
     uart_receiver_init();                                                       // 初始化串口接收机 (UART1 SBUS)
+#endif
     uart_init(UART_2, UART2_BAUDRATE, UART2_TX_PIN, UART2_RX_PIN);   // 初始化 UART2 用于接收上位机速度指令
     fifo_init(&uart2_data_fifo, FIFO_DATA_8BIT, uart2_rx_buffer, 64);          // 初始化 UART2 fifo
     uart_rx_interrupt(UART_2, 1);                                               // 开启 UART2 接收中断
@@ -270,7 +272,9 @@ int core0_main(void)
 
     while (TRUE)
     {   
+#if SBUS_SPEED_CONTROL_ENABLE
         get_expect_speed_receiver();                                        // 从遥控器接收机获取期望速度
+#endif
         if(get_expect_speed())
         {
             last_command_ms = system_ms;

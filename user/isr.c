@@ -199,7 +199,9 @@ IFX_INTERRUPT(uart1_rx_isr, 0, UART1_RX_INT_PRIO)
 {
     interrupt_global_enable(0);                     // �����ж�Ƕ��
     camera_uart_handler();                          // ���ͷ����ͳһ�ص�����
+#if SBUS_SPEED_CONTROL_ENABLE
     uart_receiver_callback();                       // ���ڽ��ջ� SBUS �ص�
+#endif
 }
 // ����2Ĭ�����ӵ�����ת����ģ��
 IFX_INTERRUPT(uart2_tx_isr, 0, UART2_TX_INT_PRIO)

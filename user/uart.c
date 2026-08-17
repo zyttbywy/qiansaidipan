@@ -119,6 +119,9 @@ uint8 get_expect_speed(void)
 //-------------------------------------------------------------------------------------------------------------------
 void get_expect_speed_receiver(void)
 {
+#if !SBUS_SPEED_CONTROL_ENABLE
+    return;
+#else
     if(uart_receiver.finsh_flag)
     {
         uart_receiver.finsh_flag = 0;
@@ -159,4 +162,5 @@ void get_expect_speed_receiver(void)
             }
         }
     }
+#endif
 }
