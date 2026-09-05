@@ -1,5 +1,6 @@
 #include "zf_common_headfile.h"
 #include "uart.h"
+#include "control.h"
 #include "zf_device_uart_receiver.h"
 
 int use_data[9] = {0};
@@ -60,8 +61,10 @@ void Data_Send(int* pst) {
 // 参数说明       void
 // 返回参数       void
 // 使用示例       get_expect_speed();
-// 备注信息       上位机发送格式: "x_speed:12 y_speed:23 o_speed:15"
-//                解析结果保存到全局变量 x_speed, y_speed, o_speed
+// 备注信息       上位机发送格式:
+//                "x_speed:12 y_speed:23 o_speed:15 servo1:90 servo2:90"
+//                servo1/servo2 are optional for backward compatibility and use degrees 0..150.
+//                解析结果保存到全局变量 x_speed, y_speed, o_speed，并更新两个舵机 PWM。
 //                依赖 UART1 接收中断将数据写入 uart2_data_fifo
 //-------------------------------------------------------------------------------------------------------------------
 uint8 get_expect_speed(void)
@@ -78,25 +81,56 @@ uint8 get_expect_speed(void)
 
         for(uint32 i = 0; i < fifo_count; i++)
         {
-            if(fifo_data[i] == 0x0A || fifo_data[i] == 0x0D)
+            if(fifo_data[i] == 0x0A)
             {
                 if(idx > 0)
                 {
                     int new_x_speed;
                     int new_y_speed;
                     int new_o_speed;
+                    int new_servo1_angle;
+                    int new_servo2_angle;
+                    int field_count;
+                    int8 ack_buffer[160];
+                    uint32 ack_length;
 
                     buffer[idx] = '\0';
-                    if(3 == sscanf(buffer, "x_speed:%d y_speed:%d o_speed:%d",
-                           &new_x_speed, &new_y_speed, &new_o_speed))
+                    field_count = sscanf(buffer,
+                            "x_speed:%d y_speed:%d o_speed:%d servo1:%d servo2:%d",
+                            &new_x_speed, &new_y_speed, &new_o_speed,
+                            &new_servo1_angle, &new_servo2_angle);
+                    if(field_count >= 3)
                     {
                         x_speed = new_x_speed;
                         y_speed = new_y_speed;
                         o_speed = new_o_speed;
+                        if(field_count >= 4)
+                        {
+                            gimbal_servo_set_angle(1, new_servo1_angle);
+                        }
+                        if(field_count >= 5)
+                        {
+                            gimbal_servo_set_angle(2, new_servo2_angle);
+                        }
+                        ack_length = zf_sprintf(ack_buffer,
+                                "ack:ok x_speed:%d y_speed:%d o_speed:%d servo1:%d servo2:%d\r\n",
+                                x_speed, y_speed, o_speed,
+                                gimbal_servo1_angle, gimbal_servo2_angle);
+                        uart_write_buffer(UART_2, (const uint8 *)ack_buffer, ack_length);
                         updated = 1;
+                    }
+                    else
+                    {
+                        ack_length = zf_sprintf(ack_buffer,
+                                "ack:error parse fields:%d\r\n", field_count);
+                        uart_write_buffer(UART_2, (const uint8 *)ack_buffer, ack_length);
                     }
                     idx = 0;
                 }
+            }
+            else if(fifo_data[i] == 0x0D)
+            {
+                // Ignore CR in CRLF; parse once when LF arrives.
             }
             else if(idx < (int)(sizeof(buffer) - 1))
             {

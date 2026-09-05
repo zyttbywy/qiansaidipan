@@ -13,6 +13,16 @@
 #define LEFT_DOWN_WHELL_PWM ATOM0_CH1_P00_2
 #define RIGHT_DOWN_WHELL_PWM ATOM3_CH0_P33_4
 
+// Gimbal servo test outputs. ATOM1 is used to avoid the existing ATOM0_CH1/P00_2 wheel output.
+#define GIMBAL_SERVO_1_PWM ATOM1_CH0_P00_0
+#define GIMBAL_SERVO_2_PWM ATOM1_CH1_P00_1
+#define GIMBAL_SERVO_MIN_ANGLE 0
+#define GIMBAL_SERVO_MAX_ANGLE 150
+#define GIMBAL_SERVO_CENTER_ANGLE 75
+#define GIMBAL_SERVO_MIN_DUTY 333
+#define GIMBAL_SERVO_MAX_DUTY 1167
+#define GIMBAL_SERVO_CENTER_DUTY 750
+
 #define LEFT_UP_FORWARD 0
 #define LEFT_UP_BACKWARD 1
 #define RIGHT_UP_FORWARD 0
@@ -52,9 +62,14 @@ extern double o;
 extern double odom_vx;
 extern double odom_vy;
 extern double odom_wz;
+extern int gimbal_servo1_angle;
+extern int gimbal_servo2_angle;
 
 void speed_compute(int x_speed, int y_speed, int o_speed);
 void speed_control(void);
 void odometry_update(uint8 use_imu_yaw);
+void gimbal_servo_init(void);
+void gimbal_servo_set_angle(uint8 servo_index, int angle);
+void gimbal_servo_test(void);
 
 #endif // _CONTROL_H_

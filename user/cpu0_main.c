@@ -237,6 +237,7 @@ int core0_main(void)
     }
     keyboard_init();
     wheel_init();
+    gimbal_servo_init();
 
     encoder_dir_init(TIM2_ENCODER, TIM2_ENCODER_CH1_P33_7, TIM2_ENCODER_CH2_P33_6);
     encoder_dir_init(TIM3_ENCODER, TIM3_ENCODER_CH1_P02_6, TIM3_ENCODER_CH2_P02_7);

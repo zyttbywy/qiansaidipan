@@ -32,6 +32,8 @@ double o = 0;
 double odom_vx = 0;
 double odom_vy = 0;
 double odom_wz = 0;
+int gimbal_servo1_angle = GIMBAL_SERVO_CENTER_ANGLE;
+int gimbal_servo2_angle = GIMBAL_SERVO_CENTER_ANGLE;
 
 static void speed_control_coast(void)
 {
@@ -306,4 +308,59 @@ void wheel_init(){
     gpio_init(RIGHT_UP_WHELL_GPIO, GPO, 0, GPO_PUSH_PULL);
     gpio_init(LEFT_DOWN_WHELL_GPIO, GPO, 0, GPO_PUSH_PULL);
     gpio_init(RIGHT_DOWN_WHELL_GPIO, GPO, 0, GPO_PUSH_PULL);
+}
+
+void gimbal_servo_init(void)
+{
+    pwm_init(GIMBAL_SERVO_1_PWM, 50, GIMBAL_SERVO_CENTER_DUTY);
+    pwm_init(GIMBAL_SERVO_2_PWM, 50, GIMBAL_SERVO_CENTER_DUTY);
+}
+
+void gimbal_servo_set_angle(uint8 servo_index, int angle)
+{
+    uint32 duty;
+
+    if(angle < GIMBAL_SERVO_MIN_ANGLE)
+    {
+        angle = GIMBAL_SERVO_MIN_ANGLE;
+    }
+    else if(angle > GIMBAL_SERVO_MAX_ANGLE)
+    {
+        angle = GIMBAL_SERVO_MAX_ANGLE;
+    }
+
+    // 0..150 degrees maps to about 0.667..2.333 ms at 50 Hz (duty 333..1167).
+    duty = GIMBAL_SERVO_MIN_DUTY
+         + (uint32)((angle * (GIMBAL_SERVO_MAX_DUTY - GIMBAL_SERVO_MIN_DUTY)
+                     + (GIMBAL_SERVO_MAX_ANGLE / 2)) / GIMBAL_SERVO_MAX_ANGLE);
+    if(servo_index == 1)
+    {
+        gimbal_servo1_angle = angle;
+        pwm_set_duty(GIMBAL_SERVO_1_PWM, duty);
+    }
+    else if(servo_index == 2)
+    {
+        gimbal_servo2_angle = angle;
+        pwm_set_duty(GIMBAL_SERVO_2_PWM, duty);
+    }
+}
+
+// Move each gimbal servo separately so its physical axis can be identified.
+// At 50 Hz, duty 750 is 1.5 ms (center) and duty 333 is about 0.667 ms.
+void gimbal_servo_test(void)
+{
+    const uint32 center_duty = GIMBAL_SERVO_CENTER_DUTY;
+    const uint32 test_duty = GIMBAL_SERVO_MIN_DUTY;
+
+    gimbal_servo_init();
+    system_delay_ms(500);
+
+    pwm_set_duty(GIMBAL_SERVO_1_PWM, test_duty);
+    system_delay_ms(2000);
+    pwm_set_duty(GIMBAL_SERVO_1_PWM, center_duty);
+    system_delay_ms(500);
+
+    pwm_set_duty(GIMBAL_SERVO_2_PWM, test_duty);
+    system_delay_ms(2000);
+    pwm_set_duty(GIMBAL_SERVO_2_PWM, center_duty);
 }
