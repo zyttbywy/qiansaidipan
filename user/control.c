@@ -329,38 +329,24 @@ void gimbal_servo_set_angle(uint8 servo_index, int angle)
         angle = GIMBAL_SERVO_MAX_ANGLE;
     }
 
-    // 0..150 degrees maps to about 0.667..2.333 ms at 50 Hz (duty 333..1167).
+    // 0..90 degrees maps to 1.0..2.0 ms at 50 Hz (duty 500..1000).
     duty = GIMBAL_SERVO_MIN_DUTY
          + (uint32)((angle * (GIMBAL_SERVO_MAX_DUTY - GIMBAL_SERVO_MIN_DUTY)
                      + (GIMBAL_SERVO_MAX_ANGLE / 2)) / GIMBAL_SERVO_MAX_ANGLE);
     if(servo_index == 1)
     {
-        gimbal_servo1_angle = angle;
-        pwm_set_duty(GIMBAL_SERVO_1_PWM, duty);
+        if(gimbal_servo1_angle != angle)
+        {
+            gimbal_servo1_angle = angle;
+            pwm_set_duty(GIMBAL_SERVO_1_PWM, duty);
+        }
     }
     else if(servo_index == 2)
     {
-        gimbal_servo2_angle = angle;
-        pwm_set_duty(GIMBAL_SERVO_2_PWM, duty);
+        if(gimbal_servo2_angle != angle)
+        {
+            gimbal_servo2_angle = angle;
+            pwm_set_duty(GIMBAL_SERVO_2_PWM, duty);
+        }
     }
-}
-
-// Move each gimbal servo separately so its physical axis can be identified.
-// At 50 Hz, duty 750 is 1.5 ms (center) and duty 333 is about 0.667 ms.
-void gimbal_servo_test(void)
-{
-    const uint32 center_duty = GIMBAL_SERVO_CENTER_DUTY;
-    const uint32 test_duty = GIMBAL_SERVO_MIN_DUTY;
-
-    gimbal_servo_init();
-    system_delay_ms(500);
-
-    pwm_set_duty(GIMBAL_SERVO_1_PWM, test_duty);
-    system_delay_ms(2000);
-    pwm_set_duty(GIMBAL_SERVO_1_PWM, center_duty);
-    system_delay_ms(500);
-
-    pwm_set_duty(GIMBAL_SERVO_2_PWM, test_duty);
-    system_delay_ms(2000);
-    pwm_set_duty(GIMBAL_SERVO_2_PWM, center_duty);
 }

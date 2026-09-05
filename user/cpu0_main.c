@@ -56,7 +56,7 @@ int expect_speed = 0;
 #define IMU_DISPLAY_X           (132)
 #define IMU_DISPLAY_VALUE_X     (156)
 
-uint8 uart2_rx_buffer[64];                                                      // UART1 接收数据缓冲区
+uint8 uart2_rx_buffer[128];                                                     // UART2 receive FIFO buffer
 fifo_struct uart2_data_fifo;                                                    // UART1 fifo 结构体
 volatile uint32 system_ms = 0;
 volatile uint8 odom_send_flag = 0;
@@ -249,7 +249,7 @@ int core0_main(void)
     uart_receiver_init();                                                       // 初始化串口接收机 (UART1 SBUS)
 #endif
     uart_init(UART_2, UART2_BAUDRATE, UART2_TX_PIN, UART2_RX_PIN);   // 初始化 UART2 用于接收上位机速度指令
-    fifo_init(&uart2_data_fifo, FIFO_DATA_8BIT, uart2_rx_buffer, 64);          // 初始化 UART2 fifo
+    fifo_init(&uart2_data_fifo, FIFO_DATA_8BIT, uart2_rx_buffer, 128);         // 初始化 UART2 fifo
     uart_rx_interrupt(UART_2, 1);                                               // 开启 UART2 接收中断
     // 此处编写用户代码 例如外设初始化代码等
     cpu_wait_event_ready();         // 等待所有核心初始化完毕

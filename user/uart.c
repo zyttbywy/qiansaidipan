@@ -63,26 +63,34 @@ void Data_Send(int* pst) {
 // 使用示例       get_expect_speed();
 // 备注信息       上位机发送格式:
 //                "x_speed:12 y_speed:23 o_speed:15 servo1:90 servo2:90"
-//                servo1/servo2 are optional for backward compatibility and use degrees 0..150.
+//                servo1/servo2 are optional for backward compatibility and use degrees 0..90.
+//                UART servo control is enabled by GIMBAL_SERVO_UART_CONTROL_ENABLE.
 //                解析结果保存到全局变量 x_speed, y_speed, o_speed，并更新两个舵机 PWM。
 //                依赖 UART1 接收中断将数据写入 uart2_data_fifo
 //-------------------------------------------------------------------------------------------------------------------
 uint8 get_expect_speed(void)
 {
-    static char buffer[64];
+    static char buffer[128];
     static int idx = 0;
+    static uint8 discard_line = 0;
     uint8 updated = 0;
 
     uint32 fifo_count = fifo_used(&uart2_data_fifo);
     if(fifo_count != 0)
     {
-        uint8 fifo_data[64];
+        uint8 fifo_data[128];
         fifo_read_buffer(&uart2_data_fifo, fifo_data, &fifo_count, FIFO_READ_AND_CLEAN);
 
         for(uint32 i = 0; i < fifo_count; i++)
         {
             if(fifo_data[i] == 0x0A)
             {
+                if(discard_line)
+                {
+                    discard_line = 0;
+                    idx = 0;
+                    continue;
+                }
                 if(idx > 0)
                 {
                     int new_x_speed;
@@ -99,19 +107,16 @@ uint8 get_expect_speed(void)
                             "x_speed:%d y_speed:%d o_speed:%d servo1:%d servo2:%d",
                             &new_x_speed, &new_y_speed, &new_o_speed,
                             &new_servo1_angle, &new_servo2_angle);
-                    if(field_count >= 3)
+                    // Reject incomplete frames. Servo PWM may only change after all five fields parse.
+                    if(field_count == 5)
                     {
                         x_speed = new_x_speed;
                         y_speed = new_y_speed;
                         o_speed = new_o_speed;
-                        if(field_count >= 4)
-                        {
-                            gimbal_servo_set_angle(1, new_servo1_angle);
-                        }
-                        if(field_count >= 5)
-                        {
-                            gimbal_servo_set_angle(2, new_servo2_angle);
-                        }
+#if GIMBAL_SERVO_UART_CONTROL_ENABLE
+                        gimbal_servo_set_angle(1, new_servo1_angle);
+                        gimbal_servo_set_angle(2, new_servo2_angle);
+#endif
                         ack_length = zf_sprintf(ack_buffer,
                                 "ack:ok x_speed:%d y_speed:%d o_speed:%d servo1:%d servo2:%d\r\n",
                                 x_speed, y_speed, o_speed,
@@ -132,9 +137,14 @@ uint8 get_expect_speed(void)
             {
                 // Ignore CR in CRLF; parse once when LF arrives.
             }
-            else if(idx < (int)(sizeof(buffer) - 1))
+            else if(!discard_line && idx < (int)(sizeof(buffer) - 1))
             {
                 buffer[idx++] = (char)fifo_data[i];
+            }
+            else
+            {
+                // A line longer than the parser buffer is discarded through its terminating LF.
+                discard_line = 1;
             }
         }
     }

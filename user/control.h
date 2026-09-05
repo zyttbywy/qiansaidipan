@@ -17,11 +17,13 @@
 #define GIMBAL_SERVO_1_PWM ATOM1_CH0_P00_0
 #define GIMBAL_SERVO_2_PWM ATOM1_CH1_P00_1
 #define GIMBAL_SERVO_MIN_ANGLE 0
-#define GIMBAL_SERVO_MAX_ANGLE 150
-#define GIMBAL_SERVO_CENTER_ANGLE 75
-#define GIMBAL_SERVO_MIN_DUTY 333
-#define GIMBAL_SERVO_MAX_DUTY 1167
+#define GIMBAL_SERVO_MAX_ANGLE 90
+#define GIMBAL_SERVO_CENTER_ANGLE 45
+#define GIMBAL_SERVO_MIN_DUTY 500
+#define GIMBAL_SERVO_MAX_DUTY 1000
 #define GIMBAL_SERVO_CENTER_DUTY 750
+// 0: ignore servo1/servo2 commands from UART2; 1: allow upper-computer servo control.
+#define GIMBAL_SERVO_UART_CONTROL_ENABLE 1
 
 #define LEFT_UP_FORWARD 0
 #define LEFT_UP_BACKWARD 1
@@ -70,6 +72,5 @@ void speed_control(void);
 void odometry_update(uint8 use_imu_yaw);
 void gimbal_servo_init(void);
 void gimbal_servo_set_angle(uint8 servo_index, int angle);
-void gimbal_servo_test(void);
 
 #endif // _CONTROL_H_
